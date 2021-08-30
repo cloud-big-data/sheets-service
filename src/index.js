@@ -231,7 +231,7 @@ io.on('connection', async socket => {
 
   socket.on('exportToCsv', async ({ title, quantity }) => {
     const s3Urls = await cnxn.exportToCSV(title, quantity);
-    socket.emit('downloadReady', s3Urls);
+    socket.emit('downloadReady', []);
   });
 
   socket.on('addUnsavedChange', change => {

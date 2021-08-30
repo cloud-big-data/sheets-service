@@ -22,7 +22,7 @@ const initial_layers = {
 const loadCompiledDataset = async (
   datasetId,
   columnsAndLayers,
-  { onlyHead = false, makeSummary = false } = {},
+  { onlyHead = false, makeSummary = false, onlyQuery = false } = {},
 ) => {
   const redshift = await makeRedshift();
   const { columns, underlyingColumns, baseColumns, layerToggles, ...rest } =
@@ -57,21 +57,26 @@ const loadCompiledDataset = async (
     ),
   )(baseColumns ?? columns);
 
+  const query = makeQueryFromLayers(
+    layerVisibilityTable.groupings,
+    applyIfVisible,
+    datasetId,
+    {
+      columns: newColumns,
+      layers,
+    },
+    {
+      makeSummary,
+      limitRows: !onlyQuery,
+    },
+  );
+
   if (makeSummary) {
-    return redshift.query(
-      makeQueryFromLayers(
-        layerVisibilityTable.groupings,
-        applyIfVisible,
-        datasetId,
-        {
-          columns: newColumns,
-          layers,
-        },
-        {
-          makeSummary: true,
-        },
-      ),
-    );
+    return redshift.query(query);
+  }
+
+  if (onlyQuery) {
+    return query;
   }
 
   if (onlyHead) {
@@ -89,20 +94,7 @@ const loadCompiledDataset = async (
     columns: newColumns,
     underlyingColumns: newColumns,
     baseColumns: baseColumns ?? columns,
-    rows: queryResponseToBoardDataRows(
-      await redshift.query(
-        makeQueryFromLayers(
-          layerVisibilityTable.groupings,
-          applyIfVisible,
-          datasetId,
-          {
-            columns: newColumns,
-            layers,
-          },
-        ),
-      ),
-      newColumns,
-    ),
+    rows: queryResponseToBoardDataRows(await redshift.query(query), newColumns),
   };
   // todo apply layers to column data
 
