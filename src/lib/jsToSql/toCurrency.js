@@ -8,10 +8,11 @@ const makeDecimalCodeString = require('./makeDecimalCodeString');
 
 const toCurrency = R.curry((currencyCode, colId) => {
   const currencyData = CURRENCY_CODES[currencyCode];
-  if (!currencyData) return colId;
+
+  if (!currencyData) return `"colId"`;
   const { decimal_digits, symbol_native } = currencyData;
 
-  return `'${symbol_native}'||TO_CHAR("${value}", '999,999,999${makeDecimalCodeString(
+  return `'${symbol_native}'||TO_CHAR("${colId}", '999,999,999${makeDecimalCodeString(
     decimal_digits,
   )}')`;
 });

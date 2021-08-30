@@ -11,6 +11,7 @@ const makeSaveRowsQuery = require('../lib/queries/makeSaveRowsQuery');
 const { makeImportQuery } = require('../lib/queries/makeImportQuery');
 const makeUnloadQuery = require('../lib/queries/makeUnloadQuery');
 const transformColumnSummaryResponse = require('../lib/transformColumnSummaryResponse');
+const lib = require('../lib');
 
 const skyvueFetch = require('../services/skyvueFetch');
 const makeRedshift = require('../services/redshift');
@@ -164,49 +165,60 @@ const Dataset = ({ datasetId, userId }) => {
     exportToCSV: async (title, quantity) => {
       // todo figure literally all of this out
       if (!baseState) return;
-      const compiled = await getCompiled(layers, baseState);
-      const documents = R.pipe(
-        R.assoc(
-          'rows',
-          R.map(row => ({
-            ...row,
-            cells: row.cells.map(cell => ({
-              ...cell,
-              value: formatValueFromBoardData(cell.columnId, cell.value, compiled),
-            })),
-          }))(compiled.rows),
-        ),
-        boardDataToCSVReadableJSON,
-        x => R.splitEvery(x.length / quantity, x),
-      )(compiled);
 
-      const objectUrls = await Promise.all(
-        documents.map(async (doc, index) => {
-          const fileName = `${datasetId}-${index}`;
-          const exportsConfig = new aws.Config({
-            region: 'us-west-1',
-            accessKeyId: process.env.AWS_ACCESS_KEY,
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-          });
-          const exportsS3 = new aws.S3(exportsConfig);
-          await exportsS3
-            .putObject({
-              Bucket: 'skyvue-exported-datasets',
-              Key: fileName,
-              ContentType: 'text/csv',
-              ContentDisposition: `attachment; filename="${title}-${index + 1}.csv`,
-              Body: jsonToCSV(doc),
-            })
-            .promise();
+      const { columns, deletedObjects } = baseState;
 
-          return process.env.NODE_ENV === 'production'
-            ? // todo move this to @tarpleyholdings aws account
-              `https://skyvue-exported-datasets.s3.amazonaws.com/${fileName}`
-            : `http://skyvue-exported-datasets.s3.amazonaws.com/${fileName}`;
-        }),
-      );
+      const query = await lib.q.makeExportQuery(datasetId, {
+        columns,
+        deletedObjects,
+      });
 
-      return objectUrls;
+      console.log('export query', query);
+
+      // console.log(query);
+      // const compiled = await getCompiled(layers, baseState);
+      // const documents = R.pipe(
+      //   R.assoc(
+      //     'rows',
+      //     R.map(row => ({
+      //       ...row,
+      //       cells: row.cells.map(cell => ({
+      //         ...cell,
+      //         value: formatValueFromBoardData(cell.columnId, cell.value, compiled),
+      //       })),
+      //     }))(compiled.rows),
+      //   ),
+      //   boardDataToCSVReadableJSON,
+      //   x => R.splitEvery(x.length / quantity, x),
+      // )(compiled);
+
+      // const objectUrls = await Promise.all(
+      //   documents.map(async (doc, index) => {
+      //     const fileName = `${datasetId}-${index}`;
+      //     const exportsConfig = new aws.Config({
+      //       region: 'us-west-1',
+      //       accessKeyId: process.env.AWS_ACCESS_KEY,
+      //       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      //     });
+      //     const exportsS3 = new aws.S3(exportsConfig);
+      //     await exportsS3
+      //       .putObject({
+      //         Bucket: 'skyvue-exported-datasets',
+      //         Key: fileName,
+      //         ContentType: 'text/csv',
+      //         ContentDisposition: `attachment; filename="${title}-${index + 1}.csv`,
+      //         Body: jsonToCSV(doc),
+      //       })
+      //       .promise();
+
+      //     return process.env.NODE_ENV === 'production'
+      //       ? // todo move this to @tarpleyholdings aws account
+      //         `https://skyvue-exported-datasets.s3.amazonaws.com/${fileName}`
+      //       : `http://skyvue-exported-datasets.s3.amazonaws.com/${fileName}`;
+      //   }),
+      // );
+
+      // return objectUrls;
     },
     getColumnSummary: async () =>
       R.pipe(
