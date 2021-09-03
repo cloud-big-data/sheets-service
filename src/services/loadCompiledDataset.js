@@ -30,6 +30,8 @@ const loadCompiledDataset = async (
 
   const layers = rest.layers ?? initial_layers;
 
+  console.log(rest, layerToggles);
+
   const joinedDatasetColumns = layers.joins?.condition?.datasetId
     ? await loadColumns(layers.joins.condition.datasetId)
     : undefined;

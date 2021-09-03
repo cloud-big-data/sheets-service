@@ -241,7 +241,8 @@ io.on('connection', async socket => {
 
   socket.on('saveRows', async () => {
     await cnxn.saveRows();
-    refreshInView(cnxn);
+    await refreshInView(cnxn);
+    saveAfterDelay();
   });
 
   socket.on('saveAsNew', async ({ newDatasetId }) => {
