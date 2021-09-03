@@ -166,12 +166,7 @@ const Dataset = ({ datasetId, userId }) => {
       // todo figure literally all of this out
       if (!baseState) return;
 
-      const { columns, deletedObjects } = baseState;
-
-      const query = await lib.q.makeExportQuery(datasetId, {
-        columns,
-        deletedObjects,
-      });
+      const query = await lib.q.makeExportQuery(datasetId, baseState);
 
       console.log('export query', query);
 
@@ -339,10 +334,6 @@ const Dataset = ({ datasetId, userId }) => {
         R.assoc('columns', baseState.baseColumns),
       )(baseState);
 
-      // console.log(
-      //   'saving something like this',
-      //   JSON.stringify(headToPersist, undefined, 2),
-      // );
       await saveColumnsToS3(datasetId, headToPersist);
     },
     saveRows: async () => {

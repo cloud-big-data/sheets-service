@@ -3,17 +3,20 @@ const knex = require('../../utils/knex');
 const lib = require('../index');
 const loadCompiledDataset = require('../../services/loadCompiledDataset');
 
-const makeExportQuery = async (datasetId, { columns, deletedObjects = [] }) => {
-  const initialQuery = await loadCompiledDataset(datasetId, undefined, {
+const makeExportQuery = async (datasetId, baseState) => {
+  const { deletedObjects, columns } = baseState;
+  const initialQuery = await loadCompiledDataset(datasetId, baseState, {
     onlyQuery: true,
   });
-  console.log('initialquery', initialQuery);
+  console.log('initial_query', initialQuery);
   console.log(columns);
 
   const columnLookup = R.indexBy(R.prop('_id'), columns);
   const colIds = R.pipe(
     R.filter(
-      col => !col.isHidden && !deletedObjects.find(obj => obj.objectId === col._id),
+      col =>
+        !col.isHidden &&
+        !(deletedObjects ?? []).find(obj => obj.objectId === col._id),
     ),
     R.pluck('_id'),
   )(columns);
@@ -29,21 +32,22 @@ const makeExportQuery = async (datasetId, { columns, deletedObjects = [] }) => {
       case 'number':
         return lib.sql.formatNumber(formatting, _id);
       default:
-        return `"column._id"`;
+        return `"${column._id}"`;
     }
   };
 
-  // make cte using results from initialQuery
   return knex
+    .with('initial_query', knex.raw(initialQuery))
     .select(
       ...colIds.map(colId => {
         const column = columnLookup[colId];
         const formatted = applyFormatting(column);
+        console.log(column?.value, formatted);
 
-        return knex.raw(`${formatted} as ${column?.value}`);
+        return knex.raw(`${formatted} as "${column?.value}"`);
       }),
     )
-    .table(lib.makeTableName(datasetId))
+    .table('initial_query')
     .toString();
 };
 

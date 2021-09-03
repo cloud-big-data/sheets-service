@@ -12,5 +12,5 @@
 
 module.exports.toCurrency = require('./toCurrency');
 module.exports.toPercent = require('./toPercent');
-module.exports.applyCommas = require('./applyCommas');
+module.exports.applyCommasAndDecimals = require('./applyCommasAndDecimals');
 module.exports.formatNumber = require('./formatNumber');
