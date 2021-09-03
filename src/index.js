@@ -65,7 +65,7 @@ io.on('connection', async socket => {
   ) {
     socket.join(datasetId);
     if (!connections[datasetId]) {
-      connections[datasetId] = Dataset({
+      connections[datasetId] = await Dataset({
         datasetId,
         userId,
       });
@@ -229,8 +229,9 @@ io.on('connection', async socket => {
     cnxn.runQueuedFunc();
   });
 
-  socket.on('exportToCsv', async ({ title, quantity }) => {
-    const s3Urls = await cnxn.exportToCSV(title, quantity);
+  socket.on('exportToCsv', async ({ title, destination }) => {
+    // todo handle different destinations
+    const s3Urls = await cnxn.exportToCSV({ title });
     socket.emit('downloadReady', []);
   });
 
