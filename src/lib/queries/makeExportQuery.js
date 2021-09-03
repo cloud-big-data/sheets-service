@@ -8,8 +8,6 @@ const makeExportQuery = async (datasetId, baseState) => {
   const initialQuery = await loadCompiledDataset(datasetId, baseState, {
     onlyQuery: true,
   });
-  console.log('initial_query', initialQuery);
-  console.log(columns);
 
   const columnLookup = R.indexBy(R.prop('_id'), columns);
   const colIds = R.pipe(
@@ -42,7 +40,6 @@ const makeExportQuery = async (datasetId, baseState) => {
       ...colIds.map(colId => {
         const column = columnLookup[colId];
         const formatted = applyFormatting(column);
-        console.log(column?.value, formatted);
 
         return knex.raw(`${formatted} as "${column?.value}"`);
       }),

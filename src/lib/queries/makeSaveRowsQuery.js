@@ -6,6 +6,7 @@ const makeTableName = require('../makeTableName');
 
 const makeSaveRowsQuery = (datasetId, baseState) => {
   const { unsavedChanges, underlyingColumns } = baseState;
+  console.log(baseState);
 
   const table = makeTableName(datasetId);
   const selectQuery = knex.select('id').table(table);

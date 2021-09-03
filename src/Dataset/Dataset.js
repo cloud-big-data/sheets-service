@@ -1,11 +1,7 @@
 const aws = require('aws-sdk');
 const R = require('ramda');
 
-const boardDataToCSVReadableJSON = require('../lib/boardDataToCSVReadableJSON');
-const jsonToCSV = require('../lib/jsonToCSV');
-const { formatValueFromBoardData } = require('../lib/formatValue');
 const makeBoardDataFromVersion = require('../lib/makeBoardDataFromVersion');
-const importToBaseState = require('../lib/importToBaseState');
 const sortDatasetByColumnOrder = require('../lib/sortDatasetByColumnOrder');
 const makeSaveRowsQuery = require('../lib/queries/makeSaveRowsQuery');
 const { makeImportQuery } = require('../lib/queries/makeImportQuery');
@@ -22,6 +18,7 @@ const addDiff = require('../utils/addDiff');
 const addLayer = require('../utils/addLayer');
 const stringifyJson = require('../utils/stringifyJson');
 
+const constants = require('../constants');
 const { MAX_IN_MEMORY_ROWS } = require('../constants/boardDataMetaConstants');
 
 const awsConfig = new aws.Config({
@@ -60,7 +57,8 @@ const initial_layers = {
   formatting: [],
 };
 
-const Dataset = ({ datasetId, userId }) => {
+const Dataset = async ({ datasetId, userId }) => {
+  const redshift = await makeRedshift();
   // todo build authentication that validates a userId has edit privileges
   const s3Params = {
     Bucket: 'skyvue-datasets',
@@ -161,59 +159,27 @@ const Dataset = ({ datasetId, userId }) => {
       layers = initial_layers;
     },
     estCSVSize: async () => 205,
-
-    exportToCSV: async (title, quantity) => {
-      // todo figure literally all of this out
+    exportToCSV: async ({ title }) => {
       if (!baseState) return;
+      const destinationKey = `${datasetId}/${title}/`;
+      const exportQuery = await lib.q.makeExportQuery(datasetId, baseState);
+      console.log(
+        `s3://${constants.s3Buckets.DATASET_EXPORTS_BUCKET}${destinationKey}`,
+        lib.q.makeUnloadQuery(
+          `s3://${constants.s3Buckets.DATASET_EXPORTS_BUCKET}/${destinationKey}`,
+          exportQuery,
+        ),
+      );
+      await redshift.query(
+        lib.q.makeUnloadQuery(
+          `s3://${constants.s3Buckets.DATASET_EXPORTS_BUCKET}/${destinationKey}`,
+          exportQuery,
+          { withHeader: true },
+        ),
+      );
 
-      const query = await lib.q.makeExportQuery(datasetId, baseState);
-
-      console.log('export query', query);
-
-      // console.log(query);
-      // const compiled = await getCompiled(layers, baseState);
-      // const documents = R.pipe(
-      //   R.assoc(
-      //     'rows',
-      //     R.map(row => ({
-      //       ...row,
-      //       cells: row.cells.map(cell => ({
-      //         ...cell,
-      //         value: formatValueFromBoardData(cell.columnId, cell.value, compiled),
-      //       })),
-      //     }))(compiled.rows),
-      //   ),
-      //   boardDataToCSVReadableJSON,
-      //   x => R.splitEvery(x.length / quantity, x),
-      // )(compiled);
-
-      // const objectUrls = await Promise.all(
-      //   documents.map(async (doc, index) => {
-      //     const fileName = `${datasetId}-${index}`;
-      //     const exportsConfig = new aws.Config({
-      //       region: 'us-west-1',
-      //       accessKeyId: process.env.AWS_ACCESS_KEY,
-      //       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      //     });
-      //     const exportsS3 = new aws.S3(exportsConfig);
-      //     await exportsS3
-      //       .putObject({
-      //         Bucket: 'skyvue-exported-datasets',
-      //         Key: fileName,
-      //         ContentType: 'text/csv',
-      //         ContentDisposition: `attachment; filename="${title}-${index + 1}.csv`,
-      //         Body: jsonToCSV(doc),
-      //       })
-      //       .promise();
-
-      //     return process.env.NODE_ENV === 'production'
-      //       ? // todo move this to @tarpleyholdings aws account
-      //         `https://skyvue-exported-datasets.s3.amazonaws.com/${fileName}`
-      //       : `http://skyvue-exported-datasets.s3.amazonaws.com/${fileName}`;
-      //   }),
-      // );
-
-      // return objectUrls;
+      // write function to loop through and rename files
+      // make signed url and return
     },
     getColumnSummary: async () =>
       R.pipe(
@@ -261,18 +227,16 @@ const Dataset = ({ datasetId, userId }) => {
      */
     importLastAppended: async importSettings => {
       if (!lastAppend) return;
-
-      const redshift = await makeRedshift();
       try {
         console.log(
           makeUnloadQuery(
-            `s3://skyvue-datasets/${datasetId}/rows/`,
+            `s3://${constants.s3Buckets.DATASETS_BUCKET}/${datasetId}/rows/`,
             makeImportQuery(importSettings, baseState.baseColumns, datasetId),
           ),
         );
         await redshift.query(
           makeUnloadQuery(
-            `s3://skyvue-datasets/${datasetId}/rows/`,
+            `s3://${constants.s3Buckets.DATASETS_BUCKET}/${datasetId}/rows/`,
             makeImportQuery(importSettings, baseState.baseColumns, datasetId),
           ),
         );
@@ -344,8 +308,7 @@ const Dataset = ({ datasetId, userId }) => {
       )
         return;
 
-      const redshift = await makeRedshift();
-
+      // todo figure out why this line is occassionally causing spectrum scan error issues
       await redshift.query(
         `
           alter table spectrum."${datasetId}_working"
