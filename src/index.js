@@ -7,9 +7,7 @@ const http = require('http').createServer(app);
 const io = require('socket.io')(http);
 const csv = require('csvtojson');
 
-const R = require('ramda');
 const Sentry = require('@sentry/node');
-const Tracing = require('@sentry/tracing');
 
 const { makeImportTableQuery } = require('./lib/queries/makeImportQuery');
 
@@ -33,6 +31,7 @@ Sentry.startTransaction({
 const { Dataset, initial_layers } = require('./Dataset');
 const loadDataset = require('./services/loadDataset');
 const applyDatasetLayers = require('./lib/applyDatasetLayers');
+const prepS3ObjectForExport = require('./jobs/prepS3ObjectForExport');
 
 const connections = {};
 const idleSaveTimer = {};
@@ -229,9 +228,14 @@ io.on('connection', async socket => {
     cnxn.runQueuedFunc();
   });
 
-  socket.on('exportToCsv', async ({ title, destination }) => {
+  socket.on('exportDataset', async ({ title, destination, maxFileSize }) => {
+    const fileUrls = await cnxn.exportDataset({
+      title,
+      destination,
+      maxFileSize,
+    });
     // todo handle different destinations
-    const s3Urls = await cnxn.exportToCSV({ title });
+    // const s3Urls = await cnxn.exportToCSV({ title });
     socket.emit('downloadReady', []);
   });
 
@@ -304,4 +308,10 @@ if (shouldRunMonitor && process.env.NODE_ENV === 'development') {
 const PORT = process.env.PORT || 8080;
 http.listen(PORT, () => {
   console.log(`listening on *:${PORT}`);
+});
+
+prepS3ObjectForExport({
+  datasetId: '61328fc383016b796ba094af',
+  fileName: 'TreeCoverLoss_2001-2020 _InPrimaryForest',
+  fileType: '.csv',
 });
