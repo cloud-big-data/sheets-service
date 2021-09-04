@@ -20,6 +20,7 @@ const stringifyJson = require('../utils/stringifyJson');
 
 const constants = require('../constants');
 const { MAX_IN_MEMORY_ROWS } = require('../constants/boardDataMetaConstants');
+const exportService = require('../services/exportService');
 
 const awsConfig = new aws.Config({
   region: 'us-east-2',
@@ -163,13 +164,7 @@ const Dataset = async ({ datasetId, userId }) => {
       if (!baseState) return;
       const destinationKey = `${datasetId}/${title}/`;
       const exportQuery = await lib.q.makeExportQuery(datasetId, baseState);
-      console.log(
-        `s3://${constants.s3Buckets.DATASET_EXPORTS_BUCKET}${destinationKey}`,
-        lib.q.makeUnloadQuery(
-          `s3://${constants.s3Buckets.DATASET_EXPORTS_BUCKET}/${destinationKey}`,
-          exportQuery,
-        ),
-      );
+
       await redshift.query(
         lib.q.makeUnloadQuery(
           `s3://${constants.s3Buckets.DATASET_EXPORTS_BUCKET}/${destinationKey}`,
@@ -265,6 +260,23 @@ const Dataset = async ({ datasetId, userId }) => {
       }
 
       return baseState;
+    },
+    exportDataset: async ({ maxFileSize, title, destination }) => {
+      if (!baseState) return;
+      // todo clean this up... It's a little verbose right now but I'm tired
+      const exportQuery = await lib.q.makeExportQuery(datasetId, baseState);
+      const postUpload = await exportService(exportQuery)[destination]?.({
+        maxFileSize,
+        destinationKey: `${datasetId}/${title}/`,
+        redshift,
+      });
+
+      const s3Urls = await postUpload({
+        datasetId,
+        title,
+      });
+
+      console.log('s3urls', s3Urls);
     },
     queueFunc: fn => {
       fnQueue = fn;
