@@ -234,9 +234,8 @@ io.on('connection', async socket => {
       destination,
       maxFileSize,
     });
-    // todo handle different destinations
-    // const s3Urls = await cnxn.exportToCSV({ title });
-    socket.emit('downloadReady', []);
+
+    socket.emit('downloadReady', fileUrls);
   });
 
   socket.on('addUnsavedChange', change => {

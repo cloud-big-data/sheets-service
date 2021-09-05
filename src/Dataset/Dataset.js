@@ -276,15 +276,15 @@ const Dataset = async ({ datasetId, userId }) => {
         title,
       });
 
-      const presignedUrls = s3Keys.map(key =>
+      const presignedUrls = s3Keys.map(({ newFileName, newFileKey }) =>
         s3.getSignedUrl('getObject', {
           Bucket: constants.s3Buckets.DATASET_EXPORTS_BUCKET,
-          Key: key,
-          ResponseContentDisposition: `attachment; filename="${title}"`,
+          Key: newFileKey,
+          ResponseContentDisposition: `attachment; filename="${newFileName}"`,
         }),
       );
 
-      console.log('presignedUrls', presignedUrls);
+      return presignedUrls;
     },
     queueFunc: fn => {
       fnQueue = fn;

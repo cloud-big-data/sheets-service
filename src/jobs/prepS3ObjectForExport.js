@@ -21,14 +21,17 @@ const prepS3ObjectForExport = fileType => async ({ datasetId, title }) =>
           return;
         }
 
-        const newFileName = `${title}${index > 0 ? index : ''}${fileType}`;
+        const newFileName = encodeURIComponent(
+          `${title}${index ? ` (${index})` : ''}${fileType}`,
+        );
         const newFileKey = `${datasetId}/processed-dataset/${newFileName}`;
 
         return s3
           .copyObject({
             Bucket: BUCKET_NAME,
-            CopySource: encodeURIComponent(`${BUCKET_NAME}/${item.Key}`),
-            Key: encodeURIComponent(newFileKey),
+            CopySource: `${BUCKET_NAME}/${item.Key}`,
+            Key: newFileKey,
+            ContentDisposition: `attachment; filename="${newFileName}`,
           })
           .promise()
           .then(() =>
@@ -39,7 +42,7 @@ const prepS3ObjectForExport = fileType => async ({ datasetId, title }) =>
                 Key: item.Key,
               })
               .promise()
-              .then(() => newFileKey),
+              .then(() => ({ newFileName, newFileKey })),
           );
       }),
     );
