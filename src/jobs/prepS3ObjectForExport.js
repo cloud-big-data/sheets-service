@@ -27,9 +27,8 @@ const prepS3ObjectForExport = fileType => async ({ datasetId, title }) =>
         return s3
           .copyObject({
             Bucket: BUCKET_NAME,
-            CopySource: `${BUCKET_NAME}/${item.Key}`,
-            Key: newFileKey,
-            ContentDisposition: `attachment; filename="${newFileName}`,
+            CopySource: encodeURIComponent(`${BUCKET_NAME}/${item.Key}`),
+            Key: encodeURIComponent(newFileKey),
           })
           .promise()
           .then(() =>

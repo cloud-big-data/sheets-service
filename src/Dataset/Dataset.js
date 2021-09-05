@@ -271,12 +271,20 @@ const Dataset = async ({ datasetId, userId }) => {
         redshift,
       });
 
-      const s3Urls = await postUpload({
+      const s3Keys = await postUpload({
         datasetId,
         title,
       });
 
-      console.log('s3urls', s3Urls);
+      const presignedUrls = s3Keys.map(key =>
+        s3.getSignedUrl('getObject', {
+          Bucket: constants.s3Buckets.DATASET_EXPORTS_BUCKET,
+          Key: key,
+          ResponseContentDisposition: `attachment; filename="${title}"`,
+        }),
+      );
+
+      console.log('presignedUrls', presignedUrls);
     },
     queueFunc: fn => {
       fnQueue = fn;
