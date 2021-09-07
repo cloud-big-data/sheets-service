@@ -15,10 +15,4 @@ router.use('/datasets', (req, res, next) => {
 });
 router.use('/datasets', require('./datasets'));
 
-router.get('/test', async (req, res) => {
-  const client = await makeRedshift();
-  const result = await client.query('select * from information_schema.tables');
-  res.json(result.rows);
-});
-
 module.exports = router;

@@ -91,4 +91,6 @@ router.post('/process_dataset', async (req, res) => {
   }
 });
 
+router.use('/jobs', require('./jobExecution'));
+
 module.exports = router;
