@@ -1,10 +1,6 @@
 const express = require('express');
 
 const router = express.Router();
-const csv = require('csvtojson');
-
-const makeRedshift = require('../services/redshift');
-const s3 = require('../services/aws');
 
 router.use('/datasets', (req, res, next) => {
   const { headers } = req;

@@ -1,6 +1,7 @@
 const lib = require('../lib');
 const constants = require('../constants');
-const prepS3ObjectForExport = require('../jobs/prepS3ObjectForExport');
+const { duplicateDataset, prepS3ObjectForExport } = require('../jobs');
+const skyvueFetch = require('./skyvueFetch');
 
 const postUpload = prepS3ObjectForExport;
 
@@ -15,6 +16,12 @@ const exportService = exportQuery => ({
     );
 
     return postUpload('.csv');
+  },
+  skyvue: async ({ datasetId, userId }) => {
+    const res = await skyvueFetch.post(`/datasets/duplicate/${datasetId}`, {
+      userId,
+    });
+    return res.json;
   },
 });
 

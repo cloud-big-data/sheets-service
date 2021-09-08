@@ -160,22 +160,6 @@ const Dataset = async ({ datasetId, userId }) => {
       layers = initial_layers;
     },
     estCSVSize: async () => 205,
-    exportToCSV: async ({ title }) => {
-      if (!baseState) return;
-      const destinationKey = `${datasetId}/${title}/`;
-      const exportQuery = await lib.q.makeExportQuery(datasetId, baseState);
-
-      await redshift.query(
-        lib.q.makeUnloadQuery(
-          `s3://${constants.s3Buckets.DATASET_EXPORTS_BUCKET}/${destinationKey}`,
-          exportQuery,
-          { withHeader: true },
-        ),
-      );
-
-      // write function to loop through and rename files
-      // make signed url and return
-    },
     getColumnSummary: async () =>
       R.pipe(
         () =>
@@ -269,22 +253,26 @@ const Dataset = async ({ datasetId, userId }) => {
         maxFileSize,
         destinationKey: `${datasetId}/${title}/`,
         redshift,
-      });
-
-      const s3Keys = await postUpload({
         datasetId,
-        title,
+        userId,
       });
 
-      const presignedUrls = s3Keys.map(({ newFileName, newFileKey }) =>
-        s3.getSignedUrl('getObject', {
-          Bucket: constants.s3Buckets.DATASET_EXPORTS_BUCKET,
-          Key: newFileKey,
-          ResponseContentDisposition: `attachment; filename="${newFileName}"`,
-        }),
-      );
+      if (typeof postUpload === 'function') {
+        const s3Keys = await postUpload({
+          datasetId,
+          title,
+        });
 
-      return presignedUrls;
+        const presignedUrls = s3Keys.map(({ newFileName, newFileKey }) =>
+          s3.getSignedUrl('getObject', {
+            Bucket: constants.s3Buckets.DATASET_EXPORTS_BUCKET,
+            Key: newFileKey,
+            ResponseContentDisposition: `attachment; filename="${newFileName}"`,
+          }),
+        );
+
+        return presignedUrls;
+      }
     },
     queueFunc: fn => {
       fnQueue = fn;

@@ -14,8 +14,8 @@ router.post('/:jobKey', async (req, res) => {
   if (!job) {
     return res.sendStatus(404);
   }
-  const execution = await job(req.body);
-  return res.json(execution);
+  const jobExecution = await job(req.body);
+  return res.json(jobExecution);
 });
 
 module.exports = router;

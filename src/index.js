@@ -28,9 +28,7 @@ Sentry.startTransaction({
   name: "Not sure what I'm doing",
 });
 
-const { Dataset, initial_layers } = require('./Dataset');
-const loadDataset = require('./services/loadDataset');
-const applyDatasetLayers = require('./lib/applyDatasetLayers');
+const { Dataset } = require('./Dataset');
 const prepS3ObjectForExport = require('./jobs/prepS3ObjectForExport');
 
 const connections = {};
