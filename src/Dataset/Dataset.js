@@ -250,7 +250,11 @@ const Dataset = async ({ datasetId, userId }) => {
     },
     exportDataset: async ({ maxFileSize, title, destination }) => {
       if (!baseState) return;
-      const exportQuery = await lib.q.makeExportQuery(datasetId, baseState);
+      const exportQuery = await lib.q.makeExportQuery({
+        datasetId,
+        baseState,
+        colOrder,
+      });
       const postUpload = await exportService(exportQuery)[destination]?.({
         maxFileSize,
         destinationKey: `${datasetId}/${title}/`,

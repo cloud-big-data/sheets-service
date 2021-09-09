@@ -2,8 +2,9 @@ const R = require('ramda');
 const knex = require('../../utils/knex');
 const lib = require('../index');
 const loadCompiledDataset = require('../../services/loadCompiledDataset');
+const sortKeysByColumnOrder = require('../sortKeysByColumnOrder');
 
-const makeExportQuery = async (datasetId, baseState) => {
+const makeExportQuery = async ({ datasetId, baseState, colOrder }) => {
   const { deletedObjects, columns } = baseState;
   const initialQuery = await loadCompiledDataset(datasetId, baseState, {
     onlyQuery: true,
@@ -16,6 +17,7 @@ const makeExportQuery = async (datasetId, baseState) => {
         !col.isHidden &&
         !(deletedObjects ?? []).find(obj => obj.objectId === col._id),
     ),
+    sortKeysByColumnOrder(colOrder, '_id'),
     R.pluck('_id'),
   )(columns);
 
