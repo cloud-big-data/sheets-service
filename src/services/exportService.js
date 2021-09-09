@@ -18,10 +18,19 @@ const exportService = exportQuery => ({
     return postUpload('.csv');
   },
   skyvue: async ({ datasetId, userId }) => {
-    const res = await skyvueFetch.post(`/datasets/duplicate/${datasetId}`, {
-      userId,
-    });
-    return res.json;
+    try {
+      const res = await skyvueFetch.post(`/datasets/duplicate/${datasetId}`, {
+        userId,
+      });
+      return {
+        success: true,
+        response: await res.json(),
+      };
+    } catch (e) {
+      return {
+        success: false,
+      };
+    }
   },
 });
 

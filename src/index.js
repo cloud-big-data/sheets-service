@@ -17,19 +17,10 @@ const makeRedshift = require('./services/redshift');
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
-
-  // We recommend adjusting this value in production, or using tracesSampler
-  // for finer control
   tracesSampleRate: 1.0,
 });
 
-Sentry.startTransaction({
-  op: 'idk',
-  name: "Not sure what I'm doing",
-});
-
 const { Dataset } = require('./Dataset');
-const prepS3ObjectForExport = require('./jobs/prepS3ObjectForExport');
 
 const connections = {};
 const idleSaveTimer = {};
@@ -55,28 +46,43 @@ app.use('/api', require('./routes'));
 io.on('connection', async socket => {
   const { datasetId, userId } = socket.handshake.query;
 
+  const handleConnection = async dataset => {
+    await dataset.load();
+    const slice = await dataset.getSlice(DEFAULT_SLICE_START, DEFAULT_SLICE_END, {
+      useCached: true,
+    });
+    // todo leverage refreshInView for this bit
+    socket.emit('initialDatasetReceived', slice);
+    socket.emit('csvEstimate', 200); // todo fixme
+    socket.emit('columnSummary', await dataset.getColumnSummary());
+    socket.emit('meta', dataset.meta);
+  };
+
   if (
     datasetId &&
     userId &&
     ORIGIN_ALLOW_LIST.includes(socket.handshake?.headers?.origin)
   ) {
     socket.join(datasetId);
-    if (!connections[datasetId]) {
-      connections[datasetId] = await Dataset({
+    const existingDataset = connections[datasetId];
+    const dataset =
+      existingDataset ??
+      (await Dataset({
         datasetId,
         userId,
-      });
+      }));
+    await handleConnection(dataset);
+    if (!existingDataset) {
+      connections[datasetId] = dataset;
     }
   }
 
   const cnxn = connections[datasetId];
 
   const saveAfterDelay = () => {
-    // todo this might should just save column data so long as cnxn.unload() is reliable.
     clearTimeout(idleSaveTimer[datasetId]);
     cnxn.queueFunc(cnxn.saveHead);
     idleSaveTimer[datasetId] = setTimeout(() => {
-      // todo interact with batch update service here?
       cnxn.saveHead();
       cnxn.clearFuncQueue();
     }, 5000);
@@ -99,20 +105,7 @@ io.on('connection', async socket => {
     }
   };
 
-  socket.on('loadDataset', async () => {
-    await cnxn.load();
-    const slice = await cnxn.getSlice(DEFAULT_SLICE_START, DEFAULT_SLICE_END, {
-      useCached: true,
-    });
-    // todo leverage refreshInView for this bit
-    socket.emit('initialDatasetReceived', slice);
-    socket.emit('csvEstimate', 200); // todo fixme
-    socket.emit('columnSummary', await cnxn.getColumnSummary());
-    socket.emit('meta', cnxn.meta);
-  });
-
   socket.on('queryBoardHeaders', async datasetId => {
-    // todo can just return column data from s3, and figure out what columns will be there
     const queriedDataset = await loadCompiledDataset(datasetId, undefined, {
       onlyHead: true,
     });
@@ -197,8 +190,6 @@ io.on('connection', async socket => {
       },
     });
 
-    console.log(json);
-
     try {
       const redshift = await makeRedshift();
       await redshift.query(makeImportTableQuery(datasetId, json));
@@ -221,19 +212,27 @@ io.on('connection', async socket => {
   });
 
   socket.on('unload', async () => {
-    // todo will need to call cnxn.unload();
     clearTimeout(idleSaveTimer[datasetId]);
     cnxn.runQueuedFunc();
   });
 
   socket.on('exportDataset', async ({ title, destination, maxFileSize }) => {
-    const fileUrls = await cnxn.exportDataset({
-      title,
-      destination,
-      maxFileSize,
-    });
+    socket.emit('clearErrors');
+    try {
+      const res = await cnxn.exportDataset({
+        title,
+        destination,
+        maxFileSize,
+      });
 
-    socket.emit('downloadReady', fileUrls);
+      if (res) socket.emit(...res);
+    } catch (e) {
+      socket.emit('boardError', {
+        message: 'Error exporting dataset',
+        section: 'export',
+        datasetId: cnxn.datasetId,
+      });
+    }
   });
 
   socket.on('addUnsavedChange', change => {
@@ -305,10 +304,4 @@ if (shouldRunMonitor && process.env.NODE_ENV === 'development') {
 const PORT = process.env.PORT || 8080;
 http.listen(PORT, () => {
   console.log(`listening on *:${PORT}`);
-});
-
-prepS3ObjectForExport({
-  datasetId: '61328fc383016b796ba094af',
-  fileName: 'TreeCoverLoss_2001-2020 _InPrimaryForest',
-  fileType: '.csv',
 });

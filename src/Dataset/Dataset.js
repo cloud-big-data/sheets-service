@@ -100,6 +100,9 @@ const Dataset = async ({ datasetId, userId }) => {
     get lastSlice() {
       return lastSlice;
     },
+    get datasetId() {
+      return datasetId;
+    },
     addDiff: async diff => {
       /*
         TODO this will be a big one.
@@ -247,7 +250,6 @@ const Dataset = async ({ datasetId, userId }) => {
     },
     exportDataset: async ({ maxFileSize, title, destination }) => {
       if (!baseState) return;
-      // todo clean this up... It's a little verbose right now but I'm tired
       const exportQuery = await lib.q.makeExportQuery(datasetId, baseState);
       const postUpload = await exportService(exportQuery)[destination]?.({
         maxFileSize,
@@ -257,21 +259,32 @@ const Dataset = async ({ datasetId, userId }) => {
         userId,
       });
 
-      if (typeof postUpload === 'function') {
+      const handleError = () => {
+        throw new Error();
+      };
+
+      if (destination === 'csv') {
         const s3Keys = await postUpload({
           datasetId,
           title,
         });
 
-        const presignedUrls = s3Keys.map(({ newFileName, newFileKey }) =>
-          s3.getSignedUrl('getObject', {
-            Bucket: constants.s3Buckets.DATASET_EXPORTS_BUCKET,
-            Key: newFileKey,
-            ResponseContentDisposition: `attachment; filename="${newFileName}"`,
-          }),
+        if (s3Keys.success === false) handleError();
+
+        const presignedUrls = (s3Keys?.response ?? []).map(
+          ({ newFileName, newFileKey }) =>
+            s3.getSignedUrl('getObject', {
+              Bucket: constants.s3Buckets.DATASET_EXPORTS_BUCKET,
+              Key: newFileKey,
+              ResponseContentDisposition: `attachment; filename="${newFileName}"`,
+            }),
         );
 
-        return presignedUrls;
+        return ['downloadReady', presignedUrls];
+      }
+      if (destination === 'skyvue') {
+        if (postUpload.success === false) handleError();
+        return ['newDataset', postUpload.response];
       }
     },
     queueFunc: fn => {
