@@ -4,7 +4,7 @@
   "description": "",
   "main": "src/index.js",
   "scripts": {
-    "start": "doppler run -- node src/index.js",
+    "start": "node src/index.js",
     "doppler": "doppler run -- npm start",
     "dev": "nodemon --inspect --exec npm run doppler",
     "test": "test"
