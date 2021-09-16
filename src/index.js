@@ -227,6 +227,7 @@ io.on('connection', async socket => {
 
       if (res) socket.emit(...res);
     } catch (e) {
+      console.error(e);
       socket.emit('boardError', {
         message: 'Error exporting dataset',
         section: 'export',
